@@ -121,7 +121,7 @@ server <- function(input, output) {
       
     })
     
-    
+    ###Change function HERE!!!!
     t2 <- reactive({as.numeric(input$t2_x)})
     h2 <- reactive({as.numeric(input$H2_x)})
     d2 <- reactive({as.numeric(input$D2_x)})
