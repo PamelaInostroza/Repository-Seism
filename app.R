@@ -6,7 +6,7 @@ library(gghighlight)
 library(mathjaxr)
 library(kableExtra)
 
-browserViewer(browser = getOption("browser"))
+options(knitr.kable.NA = '')
 
 dir <- "C:/Users/pamel/OneDrive/Jobs/Seism/"
 limits <- read.csv(paste0(dir,"pruebappn.csv"), encoding = "UTF-8")
@@ -100,13 +100,13 @@ ui <- fluidPage(
 								max = max(limits$G, na.rm = TRUE),
 								value = min(limits$G, na.rm = TRUE))),
 				mainPanel(
-					plotOutput("distPlot1", height = 300,
+					plotOutput("distPlot1", height = 500,
 					           # Equivalent to: click = clickOpts(id = "plot_click")
 					           click = "plot1_click",
 					           brush = brushOpts(
 					             id = "plot1_brush"
 					           )),
-					verbatimTextOutput("click_info")
+					tableOutput("click_info")
 					)
 			)	
 		)
@@ -214,13 +214,13 @@ server <- function(input, output, session) {
       withMathJax(paste0("Predicción de daño: ","\\(Colapso = \\dfrac{1}{1 + e^{-( \\beta_{0} + \\beta_{1}* D + \\beta_{2}*C_{r})}} > 0.5 \\)"))
     })
      
-    p <- eventReactive(input$t1_x, {
+    p <- eventReactive(input$t1_x | input$H1_x | input$D1_x | input$G1_x, {
       poindata <- data.frame(t = t1(), Hm = h1(), Dm = d1(), G = g1(), cr1 = Cr1(t(1), h1(), d1(), g1()), Tipo = "Punto seleccionado")
       predict(poindata, model)
       
     })
     
-    all <- eventReactive(input$t1_x, {
+    all <- eventReactive(input$t1_x | input$H1_x | input$D1_x | input$G1_x, {
       sim <- s()
       if (input$getdat == 0) u <- limits else u <- upd() 
       if (input$t1_x == 0) p <- NULL else p <- p() 
@@ -233,29 +233,33 @@ server <- function(input, output, session) {
       if (input$getdat == 0) dat <- limits else dat <- upd()
       
       
-      all() %>% 
-			ggplot(aes(x = Dm, y = cr1, shape = Tipo, alpha = ifelse(cats.pred == "colapso", 1, 0.7), color = cats.pred)) +
-			 geom_point(size = 4) +
-       theme(legend.position = "bottom", legend.box = "vertical") +
-			 guides(alpha = FALSE) +
-       labs(title = "Resistencia del estanque", x = "Diametro del estanque (m)", y =  "Coeficiente de resistencia - Cr1", 
-            color = "Prediccion", shape = "Datos") +
-       geom_label(aes(x = d1(), y = Cr1(t1(), h1(), d1(), g1()),
+    all() %>% 
+      ggplot(aes(x = Dm, y = cr1, shape = Tipo, alpha = ifelse(Tipo == "Punto seleccionado" | cats.pred == "colapso", 1, 0.7), 
+                 color = factor(ifelse(Tipo == "Punto seleccionado", "Punto seleccionado", ifelse(cats.pred == "colapso", "colapso","sin daño"))))) +
+      geom_point(size = 4) +
+      theme(legend.position = "bottom", legend.box = "vertical") +
+      guides(alpha = FALSE) +
+      labs(title = "Resistencia del estanque", x = "Diametro del estanque (m)", y =  "Coeficiente de resistencia - Cr1", 
+           color = "Prediccion", shape = "Datos") +
+      scale_color_manual(breaks = c("colapso", "Punto seleccionado", "sin daño"), 
+                         values=c("red", "orange", "green")) +
+      geom_label(aes(x = d1(), y = Cr1(t1(), h1(), d1(), g1()),
   				label = paste("t = ", round(t1(),2), "H = ", round(h1(),2), "D = ", round(d1(),2), "G = ", round(g1(),2))),
   				hjust = 0, vjust = -1, fill = "orange", colour = "darkblue", alpha= 0.5)
 
     })
     
-    output$click_info <- renderPrint({
-
+   # output$click_info <- renderPrint({
+      output$click_info <- function() {
+        
       # Because it's a ggplot2, we don't need to supply xvar or yvar; if this
       # were a base graphics plot, we'd need those.
-       nearPoints(all(), input$plot1_click)
-       
-      # kable(tabla, digits = c(2,2,2,2,2,2,NA,3), row.names = FALSE) %>%
-      #   kable_styling("striped", full_width = F)
+        tabla <- nearPoints(all(), input$plot1_click)
+      tabla %>% 
+      knitr::kable("html", digits = c(2,2,2,2,2,NA,3), row.names = FALSE) %>%
+        kable_styling("striped", full_width = F)
       
-    })
+    }
     
 #      
 #   ###Change function HERE!!!!
