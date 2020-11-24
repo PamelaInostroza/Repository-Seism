@@ -1,18 +1,14 @@
-## Shiny application for graph data
+
+.libPaths( c( "~/userLibrary" , .libPaths() ) )
+
+## Shiny application
 
 library(shiny)
 library(dplyr)
-library(gghighlight)
-library(mathjaxr)
-library(kableExtra)
+library(ggplot2)
 
 options(knitr.kable.NA = '')
 
-dir <- "C:/Users/pamel/OneDrive/Jobs/Seism/"
-limits <- read.csv(paste0(dir,"pruebappn.csv"), encoding = "UTF-8")
-
-  # c("ï..Item", "Country", "Loc", "Year", "Ep", "Mag", "Seism", "TAG", "Dano", "Cont", "G", "Dft", "Dm",     
-  # "Hft", "Hm", "DH", "Hmax", "HLLm", "Llen", "VL", "t", "tf", "Cr", "Anc", "Roof", "Damage")
 Cr1 <- function(t,H,D,G) {
   return(round((950 * (t^2)) / ((H)^2 * (D) * (G)),3))
 }
@@ -37,22 +33,15 @@ predict <- function(datos, model){
   return(datos)
 }
 
-limits <- limits %>% 
-  mutate(cr1 = Cr1(t = t, H = Hm, D = Dm, G = G),
-         cr2 = Cr2(t = t, H = Hm, D = Dm, G = G),
-         cats.pred = ifelse(Daño == "pandeo", "sin daño", Daño),
-         Tipo = "Efectivos")
+limits <- read.csv("pruebappn.csv", encoding = "UTF-8")
 
-col_names <- colnames(limits)
 
-model <- model(limits)
-
-# Define UI for application that draws a histogram
+# Define UI for application 
 ui <- fluidPage(
     # Application title
 	titlePanel("Prediccion de colapso"),
 		  
-	# Sidebar with a slider input for number of bins 
+	# Sidebar 
 	fluidRow(
 	  column(12,
 	     sidebarPanel(
@@ -107,6 +96,7 @@ ui <- fluidPage(
 					             id = "plot1_brush"
 					           )),
 					tableOutput("click_info")
+					#htmlOutput("click_info")
 					)
 			)	
 		)
@@ -144,9 +134,19 @@ ui <- fluidPage(
 	)
 )
 
-# Define server logic required to draw a graph
+# Define server logic required 
 server <- function(input, output, session) {
- 
+
+  
+  # c("ï..Item", "Country", "Loc", "Year", "Ep", "Mag", "Seism", "TAG", "Dano", "Cont", "G", "Dft", "Dm",     
+  # "Hft", "Hm", "DH", "Hmax", "HLLm", "Llen", "VL", "t", "tf", "Cr", "Anc", "Roof", "Damage")
+  limits <- limits %>% 
+    mutate(cr1 = Cr1(t = t, H = Hm, D = Dm, G = G),
+           cr2 = Cr2(t = t, H = Hm, D = Dm, G = G),
+           cats.pred = ifelse(Daño == "pandeo", "sin daño", Daño),
+           Tipo = "Efectivos")
+  col_names <- colnames(limits)
+  model <- model(limits)
   
   upd <- eventReactive(input$getdat, {
       df <- read.csv(input$File1$datapath, encoding = "UTF-8")
@@ -206,7 +206,7 @@ server <- function(input, output, session) {
 
   #Formula tab 1
     output$cr_text1 <- renderUI({
-						withMathJax(paste0("Coeficiente de resistencia: ","\\(C_{r} = \\dfrac{950 * t^2}{H^2 * D * G} = \\)", 
+      withMathJax(paste0("Coeficiente de resistencia: ","\\(C_{r} = \\dfrac{950 * t^2}{H^2 * D * G} = \\)", 
 						                   Cr1(t1(), h1(), d1(), g1())))
 						})
     
@@ -224,7 +224,7 @@ server <- function(input, output, session) {
       sim <- s()
       if (input$getdat == 0) u <- limits else u <- upd() 
       if (input$t1_x == 0) p <- NULL else p <- p() 
-      rbind.fill(sim[,c("t", "Hm", "Dm", "G", "cr1",  "Tipo", "cats.prob", "cats.pred")],
+      plyr::rbind.fill(sim[,c("t", "Hm", "Dm", "G", "cr1",  "Tipo", "cats.prob", "cats.pred")],
                      u[,c("t", "Hm", "Dm", "G", "cr1",  "Tipo", "cats.pred")],
                      p[,c("t", "Hm", "Dm", "G", "cr1",  "Tipo", "cats.prob", "cats.pred")])
     })
@@ -232,6 +232,7 @@ server <- function(input, output, session) {
     output$distPlot1 <- renderPlot({
       if (input$getdat == 0) dat <- limits else dat <- upd()
       
+     
       
     all() %>% 
       ggplot(aes(x = Dm, y = cr1, shape = Tipo, alpha = ifelse(Tipo == "Punto seleccionado" | cats.pred == "colapso", 1, 0.7), 
@@ -249,19 +250,23 @@ server <- function(input, output, session) {
 
     })
     
-   # output$click_info <- renderPrint({
+    #output$click_info <- renderText({
       output$click_info <- function() {
+        
         
       # Because it's a ggplot2, we don't need to supply xvar or yvar; if this
       # were a base graphics plot, we'd need those.
         tabla <- nearPoints(all(), input$plot1_click)
-      tabla %>% 
+      tabla %>%
       knitr::kable("html", digits = c(2,2,2,2,2,NA,3), row.names = FALSE) %>%
-        kable_styling("striped", full_width = F)
-      
-    }
+        kableExtra::kable_styling("striped", full_width = F)
+      }
+    #})
     
-#      
+#  rsconnect::showLogs()    
+#  .libPaths()      
+# sessioninfo::session_info()
+      
 #   ###Change function HERE!!!!
 #   t2 <- reactive({as.numeric(input$t2_x)})
 #   h2 <- reactive({as.numeric(input$H2_x)})
@@ -270,7 +275,7 @@ server <- function(input, output, session) {
 #     
 #     #Formula tab 2
 #     output$cr_text2 <- renderUI({
-# 						withMathJax(paste0("\\(C_{r} = \\dfrac{t^2}{D * \\gamma} = \\)", Cr2(t2(), h2(), d2(), g2())))
+# 						mathjaxr::withMathJax(paste0("\\(C_{r} = \\dfrac{t^2}{D * \\gamma} = \\)", Cr2(t2(), h2(), d2(), g2())))
 # 						})
 # 
 #     output$distPlot2 <- renderPlot({
